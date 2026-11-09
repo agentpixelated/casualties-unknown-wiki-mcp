@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Casualties Unknown Wiki MCP</title>
+<meta name="description" content="Public remote MCP server for the Casualties Unknown fan wiki database — items, liquids, moodles and status effects, with sprite images.">
+<style>
+  :root { color-scheme: dark; }
+  body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+         background: #101418; color: #dbe2ea; margin: 0; line-height: 1.55; }
+  main { max-width: 760px; margin: 0 auto; padding: 2.5rem 1.25rem 3rem; }
+  h1 { font-size: 1.9rem; margin: 0 0 .3rem; }
+  h2 { font-size: 1.15rem; margin: 2rem 0 .5rem; color: #9fd3a8; }
+  .sub { color: #93a1b0; margin: 0 0 1.5rem; }
+  code, pre { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+  code { background: #1b222b; padding: .1em .35em; border-radius: 4px; }
+  pre { background: #171d24; border: 1px solid #26303c; border-radius: 8px;
+        padding: 1rem; overflow-x: auto; font-size: .85rem; }
+  .endpoint { background: #171d24; border: 1px solid #2e7d46; border-radius: 8px;
+              padding: 1rem; word-break: break-all; }
+  .endpoint strong { color: #9fd3a8; }
+  table { border-collapse: collapse; width: 100%; }
+  td, th { border-bottom: 1px solid #26303c; padding: .45rem .5rem;
+           text-align: left; vertical-align: top; }
+  th { color: #93a1b0; font-weight: 600; }
+  a { color: #7cc4ff; }
+  footer { color: #71808f; font-size: .85rem; margin-top: 2.5rem; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Casualties Unknown Wiki MCP</h1>
+  <p class="sub">A public remote MCP server for the Casualties Unknown fan
+  wiki database. Search and read items, liquids, moodles/status effects,
+  recipes and more — every entry returned <em>with its sprite image</em>.
+  Free to use, no sign-up, no API key.</p>
+
+  <h2>MCP endpoint</h2>
+  <div class="endpoint"><strong>POST</strong>
+    <code>https://casualties-unknown-wiki-mcp.vercel.app/mcp</code><br>
+    Stateless Streamable HTTP transport — JSON-RPC 2.0 in,
+    <code>application/json</code> out.</div>
+
+  <h2>Connect your client</h2>
+  <p>Any MCP client that supports remote (HTTP) servers can use it
+  directly:</p>
+  <pre>{
+  "mcpServers": {
+    "casualties-unknown": {
+      "url": "https://casualties-unknown-wiki-mcp.vercel.app/mcp"
+    }
+  }
+}</pre>
+  <p>Clients that only speak stdio (or that require an SSE transport) can
+  bridge to it with a proxy such as
+  <a href="https://github.com/sparfenyuk/mcp-proxy">mcp-proxy</a> or
+  <code>npx mcp-remote https://casualties-unknown-wiki-mcp.vercel.app/mcp</code>.</p>
+
+  <h2>Tools</h2>
+  <table>
+    <tr><th>Tool</th><th>What it does</th><th>Example arguments</th></tr>
+    <tr><td><code>cu_search</code></td>
+        <td>Search everything by name across all sections.</td>
+        <td><code>{"query": "stroke"}</code></td></tr>
+    <tr><td><code>cu_item</code></td>
+        <td>Item page plus its liquid effects in one result, with sprite.</td>
+        <td><code>{"name": "sodium nitroprusside"}</code></td></tr>
+    <tr><td><code>cu_status</code></td>
+        <td>Moodle / status effect lookup, with icon.</td>
+        <td><code>{"name": "stroke"}</code></td></tr>
+    <tr><td><code>cu_get</code></td>
+        <td>Read any entry by section and slug.</td>
+        <td><code>{"section": "liquids", "slug": "procoagulant"}</code></td></tr>
+  </table>
+
+  <h2>Source &amp; code</h2>
+  <p>Source code (Python, stdlib + optional Pillow) is on GitHub:
+  <a href="https://github.com/agentpixelated/casualties-unknown-wiki-mcp">agentpixelated/casualties-unknown-wiki-mcp</a>.
+  The same code also runs locally over stdio — see the README there.</p>
+
+  <footer>
+    All data comes from the unofficial fan database
+    <a href="https://casualtiesunknowndb.com">casualtiesunknowndb.com</a>,
+    fetched live on demand — nothing is bulk-mirrored. This project is
+    <strong>not affiliated with the game developer</strong>. Game data and
+    sprites belong to their respective owners; this is a fan tool.
+  </footer>
+</main>
+</body>
+</html>
