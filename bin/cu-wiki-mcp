@@ -1,0 +1,150 @@
+#!/usr/bin/env python3
+"""Call the Casualties Unknown wiki MCP server over stdio.
+
+Usage:
+    cu-wiki-mcp list-tools
+    cu-wiki-mcp call-tool --name <tool> --arguments '<json>' \
+        [--name <tool2> --arguments '<json>' ...]
+
+The server is server/cu_wiki_mcp.py (stdlib-only, in this connector).
+One server process is spawned per invocation and shared by every
+--name/--arguments pair in order. It reads the unofficial fan DB at
+https://casualtiesunknowndb.com LIVE on demand (cached: index 24h,
+pages 1h, sprites 24h) — read-only, no credentials.
+
+Only the 4 wiki tools are allowed; anything else is hard-blocked here.
+Image content blocks are slimmed to byte counts in the printed output.
+"""
+import base64
+import json
+import os
+import subprocess
+import sys
+
+BIN_DIR = os.path.dirname(os.path.abspath(__file__))
+SERVER = os.path.join(BIN_DIR, "..", "server", "cu_wiki_mcp.py")
+
+ALLOWED_TOOLS = {
+    "cu_search",
+    "cu_get",
+    "cu_item",
+    "cu_status",
+}
+
+
+class McpClient:
+    def __init__(self):
+        self.proc = subprocess.Popen(
+            [sys.executable, SERVER],
+            stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL, text=True, bufsize=1,
+        )
+        self._id = 0
+        self._rpc("initialize", {
+            "protocolVersion": "2024-11-05", "capabilities": {},
+            "clientInfo": {"name": "cu-wiki-mcp", "version": "1.0"},
+        })
+        self.proc.stdin.write(
+            json.dumps({"jsonrpc": "2.0",
+                        "method": "notifications/initialized"}) + "\n")
+        self.proc.stdin.flush()
+
+    def _rpc(self, method, params=None):
+        self._id += 1
+        msg = {"jsonrpc": "2.0", "id": self._id, "method": method}
+        if params is not None:
+            msg["params"] = params
+        self.proc.stdin.write(json.dumps(msg) + "\n")
+        self.proc.stdin.flush()
+        while True:
+            line = self.proc.stdout.readline()
+            if not line:
+                raise RuntimeError("MCP server closed stdout")
+            try:
+                d = json.loads(line)
+            except Exception:
+                continue
+            if d.get("id") == self._id:
+                if "error" in d:
+                    raise RuntimeError(f"MCP error: {d['error']}")
+                return d.get("result")
+
+    def call_tool(self, name, arguments):
+        return self._rpc("tools/call",
+                         {"name": name, "arguments": arguments or {}})
+
+    def close(self):
+        try:
+            self.proc.stdin.close()
+        except Exception:
+            pass
+        self.proc.wait(timeout=10)
+
+
+def main(argv):
+    if len(argv) < 2 or argv[1] not in ("list-tools", "call-tool"):
+        print(__doc__)
+        return 2
+    client = McpClient()
+    try:
+        if argv[1] == "list-tools":
+            result = client._rpc("tools/list", {})
+            tools = result.get("tools", [])
+            for t in tools:
+                mark = "" if t["name"] in ALLOWED_TOOLS else " [blocked]"
+                print(f"{t['name']}{mark}")
+            return 0
+        # call-tool: collect every --name/--arguments pair in order; all
+        # run in ONE server session.
+        calls = []
+        cur_name, cur_args = None, {}
+        i = 2
+        while i < len(argv):
+            if argv[i] == "--name":
+                if cur_name:
+                    calls.append((cur_name, cur_args))
+                cur_name, cur_args = argv[i + 1], {}
+                i += 2
+            elif argv[i] == "--arguments":
+                cur_args = json.loads(argv[i + 1]); i += 2
+            else:
+                i += 1
+        if cur_name:
+            calls.append((cur_name, cur_args))
+        if not calls:
+            print("missing --name", file=sys.stderr)
+            return 2
+        for name, arguments in calls:
+            if name not in ALLOWED_TOOLS:
+                print(f"tool '{name}' is blocked by ALLOWED_TOOLS",
+                      file=sys.stderr)
+                return 3
+        for n, (name, arguments) in enumerate(calls):
+            result = client.call_tool(name, arguments)
+            # Pretty-print; image content blocks are summarized by byte
+            # count (decoded bytes), not dumped as base64.
+            def slim(o):
+                if isinstance(o, dict):
+                    if o.get("type") == "image":
+                        d = o.get("data", "")
+                        try:
+                            nbytes = len(base64.b64decode(d))
+                        except Exception:
+                            nbytes = len(d)
+                        return {"type": "image",
+                                "mimeType": o.get("mimeType"),
+                                "bytes": nbytes}
+                    return {k: slim(v) for k, v in o.items()}
+                if isinstance(o, list):
+                    return [slim(v) for v in o]
+                return o
+            if len(calls) > 1:
+                print(f"--- call {n + 1}: {name} ---")
+            print(json.dumps(slim(result), indent=1)[:20000])
+        return 0
+    finally:
+        client.close()
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))
