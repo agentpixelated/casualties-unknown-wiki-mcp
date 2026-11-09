@@ -1,0 +1,6 @@
+id: "custom.casualties-unknown"
+title: "Casualties Unknown Wiki"
+description: "Read-only live access to the unofficial Casualties Unknown fan database (casualtiesunknowndb.com): items, liquids/drugs and their effects, status effects (moodles), recipes, enemies, vitals — with sprite images returned alongside the data, via its stdlib MCP server."
+include_in_prompt: false
+require_auth: false
+aliases: ["casualties-unknown", "cu-wiki"]
