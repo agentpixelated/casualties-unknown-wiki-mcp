@@ -93,6 +93,7 @@ agent skill that routes game questions to these tools.
 ```
 server/cu_wiki_mcp.py   the MCP server (shared JSON-RPC logic + stdio entry)
 api/mcp.py              HTTP entry point for Vercel (Streamable HTTP)
+pyproject.toml          Vercel Python entrypoint declaration + Pillow dep
 index.html              public landing page for the hosted instance
 requirements.txt        Pillow (Vercel installs it; optional locally)
 vercel.json             /mcp rewrite + function config
