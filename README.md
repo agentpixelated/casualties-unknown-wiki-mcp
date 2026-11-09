@@ -8,6 +8,37 @@ Casualties Unknown (formerly Scav Prototype) is a survival game with a deep
 medical simulation — this server makes its wiki data queryable from any MCP
 client.
 
+## Use it remotely — no install
+
+The server is deployed publicly on Vercel as a stateless remote MCP
+(Streamable HTTP transport, JSON responses, no auth, no API key):
+
+**Endpoint: `https://casualties-unknown-wiki-mcp.vercel.app/mcp`**
+
+Point any MCP client that supports remote HTTP servers at it:
+
+```json
+{
+  "mcpServers": {
+    "casualties-unknown": {
+      "url": "https://casualties-unknown-wiki-mcp.vercel.app/mcp"
+    }
+  }
+}
+```
+
+Stdio-only clients can bridge through a proxy such as
+[mcp-proxy](https://github.com/sparfenyuk/mcp-proxy) or
+`npx mcp-remote https://casualties-unknown-wiki-mcp.vercel.app/mcp`.
+The landing page at <https://casualties-unknown-wiki-mcp.vercel.app/>
+summarizes the same details.
+
+The hosted instance is this exact code: `api/mcp.py` serves the shared
+JSON-RPC handler from `server/cu_wiki_mcp.py` over HTTP, with the disk
+cache redirected to `/tmp` (`CU_CACHE_DIR`) since serverless storage is
+ephemeral. This repository is git-connected to the Vercel project, so
+pushes to `main` redeploy automatically.
+
 ## Tools
 
 | Tool | What it does |
@@ -42,10 +73,10 @@ output notes the original and displayed sizes, plus the source image URL.
 - Pillow — optional. Used for the sprite upscaling; without it the server
   gracefully falls back to returning the original sprite bytes.
 
-## Running it
+## Running it locally (stdio)
 
-The server speaks newline-delimited JSON-RPC 2.0 (MCP) over stdio. The
-wrapper script is the convenient entry point:
+The server also speaks newline-delimited JSON-RPC 2.0 (MCP) over stdio.
+The wrapper script is the convenient entry point:
 
 ```sh
 bin/cu-wiki-mcp list-tools
@@ -60,7 +91,11 @@ agent skill that routes game questions to these tools.
 ## Layout
 
 ```
-server/cu_wiki_mcp.py   the MCP server
+server/cu_wiki_mcp.py   the MCP server (shared JSON-RPC logic + stdio entry)
+api/mcp.py              HTTP entry point for Vercel (Streamable HTTP)
+index.html              public landing page for the hosted instance
+requirements.txt        Pillow (Vercel installs it; optional locally)
+vercel.json             /mcp rewrite + function config
 bin/cu-wiki-mcp         CLI wrapper (list-tools / call-tool)
 connector.yaml          connector registration
 CONNECTOR.md            connector documentation
