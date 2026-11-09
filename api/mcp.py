@@ -22,6 +22,7 @@ imported. The tool functions themselves are shared unchanged with the
 stdio server — this file is only a transport adapter.
 """
 
+import importlib.util
 import json
 import os
 import sys
@@ -31,9 +32,19 @@ from pathlib import Path
 os.environ.setdefault("CU_CACHE_DIR", "/tmp/cu-wiki-cache")
 
 _ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(_ROOT / "server"))
 
-import cu_wiki_mcp  # noqa: E402
+
+def _load_server_module():
+    """Load server/cu_wiki_mcp.py by file path (no sys.path games, so
+    the import works identically locally and in the Vercel bundle)."""
+    path = _ROOT / "server" / "cu_wiki_mcp.py"
+    spec = importlib.util.spec_from_file_location("cu_wiki_mcp", path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+cu_wiki_mcp = _load_server_module()
 
 INFO = {
     "name": "cu-wiki-mcp",
@@ -94,6 +105,22 @@ class handler(BaseHTTPRequestHandler):
             self.wfile.write(body)
 
     def do_GET(self):
+        path = self.path.split("?", 1)[0]
+        if path in ("/", "/index.html"):
+            # Entrypoint routing may send / here instead of to the
+            # static file; serve the landing page either way.
+            try:
+                html = (_ROOT / "index.html").read_bytes()
+            except OSError:
+                html = (b"<!DOCTYPE html><title>Casualties Unknown Wiki "
+                        b"MCP</title><p>POST JSON-RPC to /mcp.</p>")
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(html)))
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(html)
+            return
         self._send(200, INFO)
 
     def do_POST(self):
