@@ -21,12 +21,19 @@ Protocol: newline-delimited JSON-RPC 2.0 on stdin/stdout.
 Supported methods: initialize, notifications/initialized (ignored),
 tools/list, tools/call, ping. All logging goes to stderr so stdout stays
 clean protocol traffic. No credentials exist or are stored anywhere.
+
+The cache directory defaults to cache/ in the connector dir, and can be
+overridden with the CU_CACHE_DIR environment variable (the Vercel HTTP
+entry point in api/mcp.py sets it to /tmp, the only writable location
+in a serverless sandbox). The JSON-RPC handler (handle()) is shared by
+the stdio entry point here and the HTTP entry point in api/mcp.py.
 """
 
 import base64
 import io
 import json
 import math
+import os
 import re
 import sys
 import time
@@ -42,7 +49,9 @@ UA = ("cu-wiki-mcp/1.0 (read-only live reader for "
 TIMEOUT = 20
 
 SERVER_DIR = Path(__file__).resolve().parent
-CACHE_DIR = SERVER_DIR.parent / "cache"
+_cache_env = os.environ.get("CU_CACHE_DIR")
+CACHE_DIR = (Path(_cache_env).expanduser() if _cache_env
+             else SERVER_DIR.parent / "cache")
 INDEX_FILE = CACHE_DIR / "index.json"
 PAGES_DIR = CACHE_DIR / "pages"
 IMG_DIR = CACHE_DIR / "img"
