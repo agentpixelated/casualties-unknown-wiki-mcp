@@ -1,0 +1,14 @@
+[project]
+name = "casualties-unknown-wiki-mcp"
+version = "1.0.0"
+description = "MCP server for the Casualties Unknown fan wiki DB — items, liquids, moodles/status with sprite images."
+requires-python = ">=3.9"
+dependencies = [
+    "Pillow>=10.0",
+]
+
+# Vercel Python entrypoint: the HTTP MCP function in api/mcp.py.
+# (The same file is also the /api/mcp serverless function; server/
+# holds the shared tool logic it loads.)
+[tool.vercel]
+entrypoint = "api.mcp:handler"
