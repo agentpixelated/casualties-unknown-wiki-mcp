@@ -1,0 +1,135 @@
+# cu-wiki-mcp — k3s deployment (namespace cu-wiki-mcp, node1)
+#
+# Rust binary, --http 8080, hostNetwork on node1, public exposure via a
+# published InstaBox port (like Patzer):
+#   https://8080-agqxcobsjbzbmcbys3qqt35mxi.instabox.tech
+#
+# Pattern replicated from Patzer (~/workspace/k3s-cluster/patzer/patzer.yaml):
+# hostNetwork + nodeSelector node1 + strategy Recreate + NO Service +
+# NO Ingress. kube-proxy IPv4 is unhealthy on this cluster, so ClusterIP /
+# NodePort routing is not trusted; the hostNetwork pod binds node1:8080
+# directly. Single replica: the local-path cache PVC lives on node1.
+#
+# The x402 paywall is OFF in this manifest and stays OFF until the CDP
+# facilitator key exists: the owner creates the CDP Secret API key himself
+# at https://portal.cdp.coinbase.com and it is delivered via the Secure
+# Vault — it must NEVER pass through chat and NEVER be committed here.
+# Only X402_ENABLED flips from "false" to "true" (last step, after the
+# key is mounted as a Secret).
+#
+# Addresses recorded here (env-config values only):
+# - X402_PAY_TO is the owner's Phantom EVM address (same on every EVM
+#   chain, including Base eip155:8453). It is the payTo for the Base
+#   go-live route. payTo is public by design (printed in every 402).
+# - X402_PAY_TO_SOLANA is EMPTY on purpose: the owner's Solana address
+#   kUUeaB5SVWKPDppfRSGznaQPqaUN7ob8g7nuoAA5kwN is the FUTURE Solana
+#   x402 (v2) payTo candidate only. The Solana route needs a separate
+#   verification round first — do NOT enable any Solana paywall now,
+#   and do NOT put that address in X402_PAY_TO (Base needs an EVM
+#   0x... address; Jupiter is Solana-only and cannot receive Base
+#   USDC).
+#
+# The Rust server does not read X402_PAY_TO_SOLANA at all — it is
+# recorded here only so the future Solana v2 round knows the
+# candidate address. Leave the value empty until that round.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cu-wiki-mcp
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: cu-cache
+  namespace: cu-wiki-mcp
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  # storageClassName omitted: cluster default is local-path.
+  # WaitForFirstConsumer + the pod's nodeSelector bind this volume on node1.
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cu-wiki-mcp
+  namespace: cu-wiki-mcp
+  labels:
+    app: cu-wiki-mcp
+spec:
+  replicas: 1
+  # Recreate, not RollingUpdate: this is a hostNetwork singleton on node1,
+  # so a surge pod could never bind 8080 while the old pod still holds it
+  # and a rolling rollout would stall. Recreate terminates the old pod first.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: cu-wiki-mcp
+  template:
+    metadata:
+      labels:
+        app: cu-wiki-mcp
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: instabox-k3s-node-1
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      containers:
+        - name: cu-wiki-mcp
+          image: ghcr.io/agentpixelated/casualties-unknown-wiki-mcp:1.0.0
+          imagePullPolicy: Always
+          args: ["--http", "8080"]
+          ports:
+            - containerPort: 8080
+              name: http
+          env:
+            - name: CU_CACHE_DIR
+              value: /app/cache
+            # --- x402 paywall (OFF until the CDP key arrives) ---
+            - name: X402_ENABLED
+              value: "false"
+            - name: X402_NETWORK
+              value: base
+            - name: X402_FACILITATOR_URL
+              value: https://api.cdp.coinbase.com/platform/v2/x402
+            - name: X402_PAY_TO
+              # Quoted on purpose: unquoted 0x... is parsed as a YAML
+              # 1.1 hex integer by some parsers.
+              value: "0x865339947980c60a1b254cc3439614c44c78225f"
+            # Future Solana x402 (v2) payTo candidate — intentionally
+            # empty; see the header comment. Do not enable.
+            - name: X402_PAY_TO_SOLANA
+              value: ""
+            # CDP credentials come from a Secret, never from this file:
+            #   - name: CDP_API_KEY_ID
+            #     valueFrom:
+            #       secretKeyRef: {name: cu-wiki-mcp-cdp, key: key-id}
+            #   - name: CDP_API_KEY_SECRET
+            #     valueFrom:
+            #       secretKeyRef: {name: cu-wiki-mcp-cdp, key: secret}
+          resources:
+            requests:
+              cpu: 50m
+              memory: 32Mi
+            limits:
+              cpu: 250m
+              memory: 128Mi
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 12
+          volumeMounts:
+            - name: cache
+              mountPath: /app/cache
+      volumes:
+        - name: cache
+          persistentVolumeClaim:
+            claimName: cu-cache
+# NOTE: no Service on purpose — see header comment (kube-proxy IPv4 unhealthy).
+# Exposure is hostNetwork port 8080 on node1 + a published InstaBox port.
