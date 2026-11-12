@@ -10,18 +10,17 @@ client.
 
 ## Use it remotely — no install
 
-The server is deployed publicly on Vercel as a stateless remote MCP
-(Streamable HTTP transport, JSON responses, no auth, no API key):
+The server runs as a Rust binary on a k3s cluster (hostNetwork on node1,
+public port published via InstaBox) as a stateless remote MCP (Streamable
+HTTP transport, JSON responses, no auth, no API key):
 
-**Endpoint: `https://casualties-unknown-wiki-mcp.vercel.app/mcp`**
-
-Point any MCP client that supports remote HTTP servers at it:
+**Endpoint: `https://8080-agqxcobsjbzbmcbys3qqt35mxi.instabox.tech/mcp`**
 
 ```json
 {
   "mcpServers": {
     "casualties-unknown": {
-      "url": "https://casualties-unknown-wiki-mcp.vercel.app/mcp"
+      "url": "https://8080-agqxcobsjbzbmcbys3qqt35mxi.instabox.tech/mcp"
     }
   }
 }
@@ -29,15 +28,32 @@ Point any MCP client that supports remote HTTP servers at it:
 
 Stdio-only clients can bridge through a proxy such as
 [mcp-proxy](https://github.com/sparfenyuk/mcp-proxy) or
-`npx mcp-remote https://casualties-unknown-wiki-mcp.vercel.app/mcp`.
-The landing page at <https://casualties-unknown-wiki-mcp.vercel.app/>
-summarizes the same details.
+`npx mcp-remote https://8080-agqxcobsjbzbmcbys3qqt35mxi.instabox.tech/mcp`.
+The landing page at
+<https://8080-agqxcobsjbzbmcbys3qqt35mxi.instabox.tech/> summarizes the
+same details.
 
-The hosted instance is this exact code: `api/mcp.py` serves the shared
-JSON-RPC handler from `server/cu_wiki_mcp.py` over HTTP, with the disk
-cache redirected to `/tmp` (`CU_CACHE_DIR`) since serverless storage is
-ephemeral. This repository is git-connected to the Vercel project, so
-pushes to `main` redeploy automatically.
+**x402 paywall: integrated, OFF pending CDP key.** The Rust server
+(`src/x402.rs`) implements the x402 v1 paywall — `cu_get`, `cu_item` and
+`cu_status` at $0.005/call in USDC on Base, `initialize` / `ping` /
+`tools/list` / `cu_search` free — but it is disabled in the live
+deployment (`X402_ENABLED=false` in `k8s/deployment.yaml`) until the
+CDP facilitator Secret API key is created and mounted. The paywall
+fails closed: if enabled without a usable configuration, paid tools
+answer 402 and are never served free.
+
+**Previous endpoint (still live for now):**
+`https://casualties-unknown-wiki-mcp.vercel.app/mcp` — the original
+Python implementation on Vercel. It is superseded by the k3s endpoint
+above but has not been taken down; the Python code (`server/`,
+`api/mcp.py`) remains in this repo and the Vercel project still
+auto-deploys from `main`.
+
+The hosted k3s instance is this exact code: `src/main.rs` built by
+`.github/workflows/build-push.yml` into
+`ghcr.io/agentpixelated/casualties-unknown-wiki-mcp:1.0.0` and deployed
+by `k8s/deployment.yaml` (1 replica, `--http 8080`, disk cache on a
+1Gi local-path PVC at `/app/cache`).
 
 ## Tools
 
@@ -69,14 +85,24 @@ output notes the original and displayed sizes, plus the source image URL.
 
 ## Requirements
 
-- Python 3 (standard library only for the server itself)
+- Rust (stable) + Cargo — for the live server (`src/`). No runtime
+  dependencies beyond system CA roots; the k3s image is debian-slim.
+- Python 3 (standard library only for the server itself) — for the
+  original implementation that still serves the Vercel endpoint.
 - Pillow — optional. Used for the sprite upscaling; without it the server
   gracefully falls back to returning the original sprite bytes.
 
 ## Running it locally (stdio)
 
 The server also speaks newline-delimited JSON-RPC 2.0 (MCP) over stdio.
-The wrapper script is the convenient entry point:
+The Rust binary is the local stdio server (drop-in for the Python
+one — same tools, same output):
+
+```sh
+cargo run --release -- list-tools   # or: ./target/release/cu-wiki-mcp
+```
+
+The Python wrapper below still works against `server/cu_wiki_mcp.py`:
 
 ```sh
 bin/cu-wiki-mcp list-tools
@@ -91,7 +117,13 @@ agent skill that routes game questions to these tools.
 ## Layout
 
 ```
-server/cu_wiki_mcp.py   the MCP server (shared JSON-RPC logic + stdio entry)
+src/main.rs              the Rust MCP server (live on k3s; stdio + --http)
+src/x402.rs              x402 v1 paywall (integrated, OFF pending CDP key)
+Cargo.toml / Cargo.lock  Rust manifest (binary: cu-wiki-mcp 1.0.0)
+Dockerfile               multi-stage build -> debian-slim runtime image
+.github/workflows/build-push.yml   GHCR image build on push to main
+k8s/deployment.yaml      k3s manifests (namespace + PVC + Deployment)
+server/cu_wiki_mcp.py   the Python MCP server (Vercel endpoint, still live)
 api/mcp.py              HTTP entry point for Vercel (Streamable HTTP)
 pyproject.toml          Vercel Python entrypoint declaration + Pillow dep
 index.html              public landing page for the hosted instance
