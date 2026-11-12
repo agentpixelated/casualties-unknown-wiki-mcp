@@ -38,13 +38,13 @@
 
   <h2>MCP endpoint</h2>
   <div class="endpoint"><strong>POST</strong>
-    <code>https://8080-agqxcobsjbzbmcbys3qqt35mxi.instabox.tech/mcp</code><br>
+    <code>https://casualties-unknown-wiki-mcp.vercel.app/mcp</code><br>
     Stateless Streamable HTTP transport — JSON-RPC 2.0 in,
-    <code>application/json</code> out. Rust server on k3s; the x402
+    <code>application/json</code> out. Python server on Vercel; the x402
     paywall is integrated but OFF (free for now) pending a CDP key.</div>
-  <p>Previous endpoint, still live for now:
-  <code>https://casualties-unknown-wiki-mcp.vercel.app/mcp</code>
-  (Python on Vercel, superseded by the k3s endpoint above).</p>
+  <p>Alternate endpoint, also live:
+  <code>https://8080-agqxcobsjbzbmcbys3qqt35mxi.instabox.tech/mcp</code>
+  (Rust server on a k3s cluster, same tools, same data).</p>
 
   <h2>Connect your client</h2>
   <p>Any MCP client that supports remote (HTTP) servers can use it
@@ -52,14 +52,14 @@
   <pre>{
   "mcpServers": {
     "casualties-unknown": {
-      "url": "https://8080-agqxcobsjbzbmcbys3qqt35mxi.instabox.tech/mcp"
+      "url": "https://casualties-unknown-wiki-mcp.vercel.app/mcp"
     }
   }
 }</pre>
   <p>Clients that only speak stdio (or that require an SSE transport) can
   bridge to it with a proxy such as
   <a href="https://github.com/sparfenyuk/mcp-proxy">mcp-proxy</a> or
-  <code>npx mcp-remote https://8080-agqxcobsjbzbmcbys3qqt35mxi.instabox.tech/mcp</code>.</p>
+  <code>npx mcp-remote https://casualties-unknown-wiki-mcp.vercel.app/mcp</code>.</p>
 
   <h2>Tools</h2>
   <table>
@@ -79,8 +79,7 @@
   </table>
 
   <h2>Source &amp; code</h2>
-  <p>Source code (Rust, live on k3s; Python, still serving the Vercel
-  endpoint) is on GitHub:
+  <p>Source code (Python, live on Vercel; Rust, live on k3s) is on GitHub:
   <a href="https://github.com/agentpixelated/casualties-unknown-wiki-mcp">agentpixelated/casualties-unknown-wiki-mcp</a>.
   The same code also runs locally over stdio — see the README there.</p>
 
